@@ -34,6 +34,8 @@ async function run() {
 
 const courseCollection = client.db('summerCamp').collection('course');
 
+const cartCollection = client.db("summerCamp").collection("cart");
+
 
 
 
@@ -43,6 +45,32 @@ app.get('/course', async(req,res)=>{
     res.send(result);
   
   })
+
+  app.get('/courses', async(req,res)=>{
+    const {email} = req.query;
+    console.log(email);
+
+  
+  
+    const query = {'instructor.email' : email};
+    const result = await courseCollection.find(query).toArray();
+
+    res.send(result)
+    console.log('====================================');
+    console.log(result);
+    console.log('====================================');
+
+  })
+
+  app.post('/course-cart', async(req,res)=>{
+
+    const item = req.body;
+    console.log(item);
+    const result = await cartCollection.insertOne(item);
+    res.send(result);
+  })
+
+
 
 
 
