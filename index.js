@@ -37,6 +37,11 @@ const courseCollection = client.db('summerCamp').collection('course');
 const cartCollection = client.db("summerCamp").collection("cart");
 const userCollection = client.db("summerCamp").collection("user");
 
+app.post('/jwt',(req,res)=>{
+  user = req.body;
+  const token = jwt.sign(user,process.env.ACCESS_TOKEN,{expiresIn: '5h'});
+  res.send({token});
+})
 
 
 app.post('/users',async(req,res)=>{
@@ -67,13 +72,35 @@ app.get('/users',  async(req,res)=>{
     const filter = {_id: new ObjectId(id)}
     const updateDoc ={
       $set: {
-        role: 'admin'
+        role: 'admin' 
       },
       
     };
     const result = await userCollection.updateOne(filter,updateDoc);
       res.send(result);
   })
+  app.patch('/users/instructor/:id', async (req, res) => {
+    const id = req.params.id;
+    const filter = { _id: new ObjectId(id) };
+    const updateDoc = {
+      $set: {
+        role: 'instructor'
+      },
+    };
+    const result = await userCollection.updateOne(filter, updateDoc);
+    res.send(result);
+  });
+  
+
+
+
+
+
+
+
+
+
+
 
   app.get('/users/admin/:email',async(req,res)=>{
 
@@ -84,6 +111,14 @@ app.get('/users',  async(req,res)=>{
     const result = { admin : user?.role === 'admin'}
     res.send(result);
   })
+  app.delete('/users/delete/:id', async (req,res)=>{
+    const id =req.params.id;
+    console.log(id);
+    const query = {_id: new ObjectId(id)};
+    const result = await userCollection.deleteOne(query);
+    res.send(result)
+    
+    })
 
 
 app.get('/course', async(req,res)=>{
