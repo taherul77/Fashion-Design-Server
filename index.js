@@ -13,6 +13,25 @@ app.use(cors());
 app.use(express.json());
 
 
+const verifyJWT = (req,res,next) =>{
+  const authorization = req.headers.authorization;
+  
+  if(!authorization){
+    return res.status(401).send({error: true , message: 'unauthorized access'});
+    
+  } 
+  const token = authorization.split(' ')[1];
+    jwt.verify(token, process.env.ACCESS_TOKEN,(err,decoded)=>{
+      if(err){
+        return res.status(401).send({error: true, message: 'unauthorized access'})
+      }
+      req.decoded =decoded;
+      next();
+    })
+  
+  }
+
+
 
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.iroozgm.mongodb.net/?retryWrites=true&w=majority`;
@@ -128,19 +147,17 @@ app.get('/course', async(req,res)=>{
   
   })
 
-  app.get('/courses', async(req,res)=>{
+  app.get('/courses',  async(req,res)=>{
     const {email} = req.query;
     console.log(email);
 
-  
+ 
   
     const query = {'instructor.email' : email};
     const result = await courseCollection.find(query).toArray();
 
     res.send(result)
-    console.log('====================================');
-    console.log(result);
-    console.log('====================================');
+   
 
   })
 
@@ -151,14 +168,17 @@ app.get('/course', async(req,res)=>{
     const result = await cartCollection.insertOne(item);
     res.send(result);
   })
-  app.get('/course-cart', async(req, res)=>{
+  app.get('/course-cart', verifyJWT, async(req, res)=>{
 
     const email = req.query.email;
-    console.log('====================================');
-    console.log(email);
-    console.log('====================================');
+   
     if(!email){
       res.send([]);
+    }
+   
+    const decodedEmail = req.decoded.email;
+    if(email !== decodedEmail){
+      return req.status(403).send({error: true, message: 'forbidden access'})
     }
     
     const query = { email : email};
