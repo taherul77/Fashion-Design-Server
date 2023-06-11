@@ -102,7 +102,7 @@ async function run() {
         currency: "BDT",
         tran_id: tran_id, // use unique tran_id for each api call
         success_url: `http://localhost:5000/payment/success/${tran_id}`,
-        fail_url: `http://localhost:5000/fail/${tran_id}`,
+        fail_url: `http://localhost:5000/payment/fail/${tran_id}`,
         cancel_url: "http://localhost:3030/cancel",
         ipn_url: "http://localhost:3030/ipn",
         shipping_method: "Courier",
@@ -161,20 +161,24 @@ async function run() {
           res.redirect(`http://localhost:5173/payment/success/${tran_id}`);
         }
       });
-      app.post('/fail/:tran_id', async(req,res)=>{
-        const result = await orderCollection.deleteOne({tran_id:tran_id});
-        if(result.deletedCount){
-          res.redirect(`http://localhost:5173/fail/${tran_id}`)
+      app.post("/payment/fail/:tran_id", async (req, res) => {
+        const { tran_id } = req.params;
+        const result = await orderCollection.deleteOne({
+          transactionId: tran_id,
+        });
+        if (result.deletedCount) {
+          res.redirect(`http://localhost:5173/payment/fail/${tran_id}`);
         }
-      })
+      });
     });
 
-    app.get("/users", verifyJWT, async (req, res) => {
+    app.get("/users", async (req, res) => {
       const result = await userCollection.find().toArray();
+      console.log(result);
       res.send(result);
     });
 
-    app.patch("/users/admin/:id", verifyJWT,  async (req, res) => {
+    app.patch("/users/admin/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updateDoc = {
@@ -204,10 +208,6 @@ async function run() {
       res.send(user);
     });
 
-   
-
-    
-
     app.delete("/users/delete/:id", async (req, res) => {
       const id = req.params.id;
       console.log(id);
@@ -219,6 +219,46 @@ async function run() {
     app.get("/course", async (req, res) => {
       const data = courseCollection.find();
       const result = await data.toArray();
+      res.send(result);
+    });
+    app.post("/course", async (req, res) => {
+      const newCourse = req.body;
+      const {
+        name,
+        description,
+        price,
+        duration,
+        available_seats,
+        image,
+        instructor,
+      } = newCourse;
+
+      const oldCourse = await courseCollection.findOne({
+        "instructor.email": instructor.email,
+      });
+      let courseQuantity;
+      if (oldCourse === null) {
+        courseQuantity = 1
+      }else{
+        courseQuantity = parseInt(oldCourse?.instructor?.course_taken) + 1
+      }
+      data = {
+        name: name,
+        description: description,
+        price: price,
+        duration: duration,
+        available_seats: available_seats,
+        image: image,
+        instructor: {
+          name: instructor.name,
+          email: instructor.email,
+          image: instructor.image,
+          course_name: instructor.course_name,
+          course_taken: courseQuantity,
+        },
+      };
+
+      const result = await courseCollection.insertOne(data)
       res.send(result);
     });
 
@@ -270,6 +310,12 @@ async function run() {
       const result = await cartCollection.deleteOne(query);
       res.send(result);
     });
+
+    app.get("/my-enroll-course/:email", async (req,res) => {
+      const {email} =req.params
+      const result = await orderCollection.find({"order.customerEmail" : email}).toArray()
+      res.send(result)
+    } )
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
