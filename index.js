@@ -143,7 +143,6 @@ async function run() {
       });
 
       app.post("/payment/success/:tran_id", async (req, res) => {
-        console.log(req.params);
         const { tran_id } = req.params;
 
         const result = await orderCollection.updateOne(
@@ -158,6 +157,16 @@ async function run() {
         );
 
         if (result.modifiedCount > 0) {
+          const currentOrder = await orderCollection.findOne({
+            transactionId: tran_id,
+          });
+          const currentOrderId = currentOrder.order.courseId;
+
+          const updateSeat = await courseCollection.updateOne(
+            { courseId: currentOrderId },
+            { $inc: { available_seats: -1 } }
+          );
+
           res.redirect(`http://localhost:5173/payment/success/${tran_id}`);
         }
       });
@@ -217,10 +226,31 @@ async function run() {
     });
 
     app.get("/course", async (req, res) => {
-      const data = courseCollection.find();
+      const data = courseCollection.find({ status: true });
       const result = await data.toArray();
       res.send(result);
     });
+
+    app.get("/course-all", async (req, res) => {
+      const data = courseCollection.find({});
+      const result = await data.toArray();
+      res.send(result);
+    });
+
+    app.patch("/update/course", async (req, res) => {
+      console.log(req.body);
+      const { courseId } = req.body;
+      const result = await courseCollection.updateOne(
+        { courseId: courseId },
+        {
+          $set: {
+            status: true,
+          },
+        }
+      );
+      res.send(result)
+    });
+
     app.post("/course", async (req, res) => {
       const newCourse = req.body;
       const {
@@ -233,19 +263,29 @@ async function run() {
         instructor,
       } = newCourse;
 
+      const bigCourseData = await courseCollection
+        .find({})
+        .sort({ courseId: -1 })
+        .limit(1)
+        .toArray();
+
+      let courseId = bigCourseData[0].courseId + 1;
+
       const oldCourse = await courseCollection.findOne({
         "instructor.email": instructor.email,
       });
       let courseQuantity;
       if (oldCourse === null) {
-        courseQuantity = 1
-      }else{
-        courseQuantity = parseInt(oldCourse?.instructor?.course_taken) + 1
+        courseQuantity = 1;
+      } else {
+        courseQuantity = parseInt(oldCourse?.instructor?.course_taken) + 1;
       }
       data = {
         name: name,
+        courseId: courseId,
         description: description,
         price: price,
+        status: false,
         duration: duration,
         available_seats: available_seats,
         image: image,
@@ -258,7 +298,7 @@ async function run() {
         },
       };
 
-      const result = await courseCollection.insertOne(data)
+      const result = await courseCollection.insertOne(data);
       res.send(result);
     });
 
@@ -285,6 +325,30 @@ async function run() {
       const result = await cartCollection.insertOne(item);
       res.send(result);
     });
+
+    app.get("/get_instructors", async (req, res) => {
+      const allInstructor = await courseCollection
+        .find()
+        .project({ instructor: 1 })
+        .toArray();
+      console.log(allInstructor);
+
+      const filteredData = Object.values(
+        allInstructor.reduce((acc, { instructor }) => {
+          const { email, course_taken } = instructor;
+          if (
+            !acc[email] ||
+            course_taken > acc[email].instructor.course_taken
+          ) {
+            acc[email] = { instructor };
+          }
+          return acc;
+        }, {})
+      );
+
+      res.send(filteredData);
+    });
+
     app.get("/course-cart", verifyJWT, async (req, res) => {
       const email = req.query.email;
 
@@ -311,11 +375,13 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/my-enroll-course/:email", async (req,res) => {
-      const {email} =req.params
-      const result = await orderCollection.find({"order.customerEmail" : email}).toArray()
-      res.send(result)
-    } )
+    app.get("/my-enroll-course/:email", async (req, res) => {
+      const { email } = req.params;
+      const result = await orderCollection
+        .find({ "order.customerEmail": email }).sort({"order.price": 1})
+        .toArray();
+      res.send(result);
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
