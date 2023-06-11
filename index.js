@@ -102,7 +102,7 @@ async function run() {
         currency: "BDT",
         tran_id: tran_id, // use unique tran_id for each api call
         success_url: `http://localhost:5000/payment/success/${tran_id}`,
-        fail_url: "http://localhost:3030/fail",
+        fail_url: `http://localhost:5000/fail/${tran_id}`,
         cancel_url: "http://localhost:3030/cancel",
         ipn_url: "http://localhost:3030/ipn",
         shipping_method: "Courier",
@@ -157,18 +157,24 @@ async function run() {
           }
         );
 
-        if(result.modifiedCount>0){
-          res.redirect(`http://localhost:5173/payment/success/${tran_id}`)
+        if (result.modifiedCount > 0) {
+          res.redirect(`http://localhost:5173/payment/success/${tran_id}`);
         }
       });
+      app.post('/fail/:tran_id', async(req,res)=>{
+        const result = await orderCollection.deleteOne({tran_id:tran_id});
+        if(result.deletedCount){
+          res.redirect(`http://localhost:5173/fail/${tran_id}`)
+        }
+      })
     });
 
-    app.get("/users", async (req, res) => {
+    app.get("/users", verifyJWT, async (req, res) => {
       const result = await userCollection.find().toArray();
       res.send(result);
     });
 
-    app.patch("/users/admin/:id", verifyJWT, verifyAdmin, async (req, res) => {
+    app.patch("/users/admin/:id", verifyJWT,  async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updateDoc = {
@@ -191,14 +197,17 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/users/admin/:email", async (req, res) => {
+    app.get("/users/:email", async (req, res) => {
       const email = req.params.email;
-
       const query = { email: email };
       const user = await userCollection.findOne(query);
-      const result = { admin: user?.role === "admin" };
-      res.send(result);
+      res.send(user);
     });
+
+   
+
+    
+
     app.delete("/users/delete/:id", async (req, res) => {
       const id = req.params.id;
       console.log(id);
