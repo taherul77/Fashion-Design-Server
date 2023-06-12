@@ -52,7 +52,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     const courseCollection = client.db("summerCamp").collection("course");
 
@@ -101,8 +101,8 @@ async function run() {
         total_amount: price,
         currency: "BDT",
         tran_id: tran_id, // use unique tran_id for each api call
-        success_url: `http://localhost:5000/payment/success/${tran_id}`,
-        fail_url: `http://localhost:5000/payment/fail/${tran_id}`,
+        success_url: `https://summer-camp-server-mauve.vercel.app/payment/success/${tran_id}`,
+        fail_url: `https://summer-camp-server-mauve.vercel.app/payment/fail/${tran_id}`,
         cancel_url: "http://localhost:3030/cancel",
         ipn_url: "http://localhost:3030/ipn",
         shipping_method: "Courier",
@@ -167,7 +167,7 @@ async function run() {
             { $inc: { available_seats: -1, totalEnroll: 1 } }
           );
 
-          res.redirect(`http://localhost:5173/payment/success/${tran_id}`);
+          res.redirect(`https://summer-camp-7067e.web.app/payment/success/${tran_id}`);
         }
       });
       app.post("/payment/fail/:tran_id", async (req, res) => {
@@ -176,7 +176,7 @@ async function run() {
           transactionId: tran_id,
         });
         if (result.deletedCount) {
-          res.redirect(`http://localhost:5173/payment/fail/${tran_id}`);
+          res.redirect(`https://summer-camp-7067e.web.app/payment/fail/${tran_id}`);
         }
       });
     });
@@ -196,7 +196,7 @@ async function run() {
       res.send(data);
     });
 
-    app.patch("/users/admin/:id", verifyJWT, verifyAdmin, async (req, res) => {
+    app.patch("/users/admin/:id",  async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updateDoc = {
