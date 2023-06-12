@@ -161,10 +161,10 @@ async function run() {
             transactionId: tran_id,
           });
           const currentOrderId = currentOrder.order.courseId;
-
+          console.log(currentOrderId);
           const updateSeat = await courseCollection.updateOne(
             { courseId: currentOrderId },
-            { $inc: { available_seats: -1 } }
+            { $inc: { available_seats: -1, totalEnroll: 1 } }
           );
 
           res.redirect(`http://localhost:5173/payment/success/${tran_id}`);
@@ -187,7 +187,16 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/users/admin/:id", verifyJWT, async (req, res) => {
+    app.get("/popular-course", async (req, res) => {
+      const data = await courseCollection
+        .find({})
+        .sort({ totalEnroll: -1 })
+        .limit(6)
+        .toArray();
+      res.send(data);
+    });
+
+    app.patch("/users/admin/:id", verifyJWT, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updateDoc = {
@@ -210,6 +219,17 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/get-my-course/:email", async (req, res) => {
+      const { email } = req.params;
+      const myCourse = await courseCollection
+        .find({
+          "instructor.email": email,
+        })
+        .toArray();
+
+      res.send(myCourse);
+    });
+
     app.get("/users/:email", async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
@@ -226,7 +246,7 @@ async function run() {
     });
 
     app.get("/course", async (req, res) => {
-      const data = courseCollection.find({ status: true });
+      const data = courseCollection.find({ status: "approve" });
       const result = await data.toArray();
       res.send(result);
     });
@@ -244,11 +264,26 @@ async function run() {
         { courseId: courseId },
         {
           $set: {
-            status: true,
+            status: "approve",
           },
         }
       );
-      res.send(result)
+      res.send(result);
+    });
+
+    app.patch("/update/course/deny", async (req, res) => {
+      console.log(req.body);
+      const { courseId, feedback } = req.body;
+      const result = await courseCollection.updateOne(
+        { courseId: courseId },
+        {
+          $set: {
+            status: "deny",
+            feedback: feedback,
+          },
+        }
+      );
+      res.send(result);
     });
 
     app.post("/course", async (req, res) => {
@@ -286,8 +321,9 @@ async function run() {
         description: description,
         price: price,
         status: false,
+        totalEnroll: 0,
         duration: duration,
-        available_seats: available_seats,
+        available_seats: parseInt(available_seats),
         image: image,
         instructor: {
           name: instructor.name,
@@ -378,10 +414,18 @@ async function run() {
     app.get("/my-enroll-course/:email", async (req, res) => {
       const { email } = req.params;
       const result = await orderCollection
-        .find({ "order.customerEmail": email }).sort({"order.price": 1})
+        .find({ "order.customerEmail": email })
+        .sort({ "order.price": 1 })
         .toArray();
       res.send(result);
     });
+
+    // app.get("/course/:email", async (req, res) => {
+    //   const email = req.params.email;
+    //   const query = { email: email };
+    //   const myCourse = await courseCollection.find(query).toArray();
+    //   res.send(myCourse);
+    // });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
